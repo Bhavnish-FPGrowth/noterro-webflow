@@ -1,13 +1,13 @@
 export default async function handler(req, res) {
-  res.setHeader("Access-Control-Allow-Origin", "*"); // allow Webflow to call it
+  res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 
   if (req.method === "OPTIONS") {
-    return res.status(200).end(); // preflight check
+    return res.status(200).end();
   }
 
-  const { query } = req.query; // search keyword
+  const { query } = req.query;
   const collectionId = process.env.WEBFLOW_COLLECTION_ID;
 
   try {
@@ -26,31 +26,42 @@ export default async function handler(req, res) {
     }
 
     const data = await response.json();
-    console.log("data", data);
+    console.log("RAW Webflow response:", data);
 
-    // filter by query (case insensitive)
     let filtered = data.items;
+
     if (query && query.trim() !== "") {
-      filtered = data.items.filter((item) =>
-        item.title.toLowerCase().includes(query.toLowerCase())
-      );
+      filtered = data.items.filter((item) => {
+        const title =
+          item.fieldData.name ||
+          item.fieldData.title ||
+          item.fieldData.slug ||
+          "";
+        return title.toLowerCase().includes(query.toLowerCase());
+      });
     }
 
-    // attach read-time calculation
     const posts = filtered.map((item) => {
-      const text = item.content || ""; // adjust field name if different
-      const words = text.split(/\s+/).length;
-      const readTime = Math.max(1, Math.ceil(words / 200)); // 200 wpm
+      const title = item.fieldData.name || item.fieldData.title || "Untitled";
+      const slug = item.fieldData.slug || "#";
+
+      // ✅ Rich Text "Content" field
+      const text = item.fieldData.content || "";
+
+      // remove HTML tags and count words
+      const words = text.replace(/<[^>]+>/g, "").split(/\s+/).filter(Boolean).length;
+      const readTime = Math.max(1, Math.ceil(words / 200)); // 200 words per min
 
       return {
-        title: item.name,
-        slug: item.slug,
+        title,
+        slug,
         readTime,
       };
     });
 
     res.status(200).json({ items: posts });
   } catch (error) {
+    console.error("API error:", error);
     res.status(500).json({ error: error.message });
   }
 }
