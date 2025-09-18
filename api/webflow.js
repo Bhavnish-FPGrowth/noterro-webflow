@@ -26,7 +26,7 @@ export default async function handler(req, res) {
     }
 
     const data = await response.json();
-    console.log("RAW Webflow response:", data);
+   
 
     let filtered = data.items;
 
@@ -40,6 +40,9 @@ export default async function handler(req, res) {
         return title.toLowerCase().includes(query.toLowerCase());
       });
     }
+
+    // ✅ Limit to 10 results
+    filtered = filtered.slice(0, 10);
 
     const posts = filtered.map((item) => {
       const title = item.fieldData.name || item.fieldData.title || "Untitled";
