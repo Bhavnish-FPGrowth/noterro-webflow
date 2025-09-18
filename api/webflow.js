@@ -27,6 +27,8 @@ export default async function handler(req, res) {
 
     const data = await response.json();
 
+    console.log("response", data);
+
     let filtered = data.items;
 
     if (query && query.trim() !== "") {
