@@ -32,13 +32,13 @@ export default async function handler(req, res) {
     let filtered = data.items;
     if (query && query.trim() !== "") {
       filtered = data.items.filter((item) =>
-        item.name.toLowerCase().includes(query.toLowerCase())
+        item.title.toLowerCase().includes(query.toLowerCase())
       );
     }
 
     // attach read-time calculation
     const posts = filtered.map((item) => {
-      const text = item.richText || ""; // adjust field name if different
+      const text = item.content || ""; // adjust field name if different
       const words = text.split(/\s+/).length;
       const readTime = Math.max(1, Math.ceil(words / 200)); // 200 wpm
 
