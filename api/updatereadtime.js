@@ -1,3 +1,5 @@
+// api/updatereadtime.js
+
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
@@ -9,16 +11,21 @@ export default async function handler(req, res) {
     const webhookPayload = req.body.payload;
     if (!webhookPayload) throw new Error("Missing webhook payload");
 
-    const itemId = webhookPayload.id;
-    const collectionId = webhookPayload.collectionId;
+    // ✅ Handle both beta / real-world formats
+    const item = Array.isArray(webhookPayload.items)
+      ? webhookPayload.items[0]   // beta format: items array
+      : webhookPayload;           // stable format: single object
+
+    const itemId = item.id;
+    const collectionId = item.collectionId;
 
     if (!itemId) throw new Error("Missing itemId in webhook payload");
     if (!collectionId) throw new Error("Missing collectionId in webhook payload");
 
     const apiKey = process.env.WEBFLOW_API_TOKEN;
-    if (!apiKey) throw new Error("Missing Webflow API token in env variables");
+    if (!apiKey) throw new Error("Missing Webflow API token in environment variables");
 
-    // Step 1: Fetch item from Webflow
+    // Step 1: Fetch the item from Webflow
     const getUrl = `https://api.webflow.com/v2/collections/${collectionId}/items/${itemId}`;
     const getResp = await fetch(getUrl, {
       headers: {
@@ -40,7 +47,7 @@ export default async function handler(req, res) {
     const words = richText.replace(/<[^>]+>/g, "").trim().split(/\s+/).filter(Boolean).length;
     const readTime = Math.max(1, Math.ceil(words / 200));
 
-    console.log(`Words count: ${words}, Read time: ${readTime} min`);
+    console.log(`Item ${itemId} - Words: ${words}, Read time: ${readTime} min`);
 
     // Step 3: Update CMS item
     const patchUrl = `https://api.webflow.com/v2/collections/${collectionId}/items/${itemId}`;
@@ -54,7 +61,7 @@ export default async function handler(req, res) {
       body: JSON.stringify({
         fieldData: {
           ...blog.fieldData,
-          "read-time": readTime, // replace with your read-time field slug
+          "read-time": readTime // replace with your read-time field slug
         }
       })
     });
