@@ -37,7 +37,7 @@ export default async function handler(req, res) {
       {
         fieldData: {
           ...blog.fieldData,
-          readTime: readTime, // Replace with your CMS field slug
+          "read-time": readTime, // Replace with your CMS field slug
         },
       },
       {
