@@ -6,7 +6,6 @@ export default async function handler(req, res) {
   try {
     console.log("Webhook payload:", req.body);
 
-    // Extract payload from Webflow webhook
     const webhookPayload = req.body.payload;
     if (!webhookPayload) throw new Error("Missing webhook payload");
 
@@ -19,12 +18,12 @@ export default async function handler(req, res) {
     const apiKey = process.env.WEBFLOW_API_TOKEN;
     if (!apiKey) throw new Error("Missing Webflow API token in env variables");
 
-    // Step 1: Fetch item
+    // Step 1: Fetch item from Webflow
     const getUrl = `https://api.webflow.com/v2/collections/${collectionId}/items/${itemId}`;
     const getResp = await fetch(getUrl, {
       headers: {
         "Authorization": `Bearer ${apiKey}`,
-        "accept-version": "1.0.0"
+        "accept-version": "1.0.0",
       }
     });
 
@@ -55,7 +54,7 @@ export default async function handler(req, res) {
       body: JSON.stringify({
         fieldData: {
           ...blog.fieldData,
-          "read-time": readTime // replace with your read-time field slug
+          "read-time": readTime, // replace with your read-time field slug
         }
       })
     });
@@ -67,6 +66,7 @@ export default async function handler(req, res) {
     }
 
     const updatedBlog = await patchResp.json();
+    console.log(`Item ${itemId} updated successfully.`);
 
     return res.status(200).json({ success: true, readTime, updatedBlog });
 
