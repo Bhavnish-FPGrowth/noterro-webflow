@@ -1,18 +1,14 @@
-import axios from "axios";
-
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
   try {
-    const { _id, collectionId } = req.body; // Webflow webhook payload
-    console.log("Webhook received for item:", _id);
-
+    const { _id, collectionId } = req.body;
     const apiKey = process.env.WEBFLOW_API_TOKEN;
 
-    // Step 1: Fetch the blog item from Webflow
-    const itemRes = await axios.get(
+    // Step 1: Fetch item
+    const itemRes = await fetch(
       `https://api.webflow.com/v2/collections/${collectionId}/items/${_id}`,
       {
         headers: {
@@ -21,38 +17,38 @@ export default async function handler(req, res) {
       }
     );
 
-    const blog = itemRes.data;
-    const richText = blog.fieldData?.content || ""; // Replace "content" with your Rich Text slug
+    if (!itemRes.ok) throw new Error("Failed to fetch item");
+    const blog = await itemRes.json();
 
     // Step 2: Calculate read time
-    const wordsPerMinute = 200;
+    const richText = blog.fieldData?.content || ""; // 👈 Replace 'content' with your Rich Text field slug
     const words = richText.replace(/<[^>]+>/g, "").trim().split(/\s+/).length;
-    const readTime = Math.max(1, Math.ceil(words / wordsPerMinute));
+    const readTime = Math.max(1, Math.ceil(words / 200));
 
-    console.log(`Calculated read time: ${readTime} minutes`);
-
-    // Step 3: Update item back in Webflow
-    const updateRes = await axios.patch(
+    // Step 3: Update CMS item
+    const updateRes = await fetch(
       `https://api.webflow.com/v2/collections/${collectionId}/items/${_id}`,
       {
-        fieldData: {
-          ...blog.fieldData,
-          "read-time": readTime, // Replace with your CMS field slug
-        },
-      },
-      {
+        method: "PATCH",
         headers: {
           Authorization: `Bearer ${apiKey}`,
           "Content-Type": "application/json",
         },
+        body: JSON.stringify({
+          fieldData: {
+            ...blog.fieldData,
+            "read-time": readTime // 👈 Replace with your custom field slug
+          },
+        }),
       }
     );
 
-    console.log("Item updated:", updateRes.data);
+    if (!updateRes.ok) throw new Error("Failed to update item");
+    const updated = await updateRes.json();
 
-    return res.status(200).json({ success: true, readTime });
+    return res.status(200).json({ success: true, readTime, updated });
   } catch (err) {
-    console.error("Error:", err.response?.data || err.message);
-    return res.status(500).json({ error: "Something went wrong" });
+    console.error("Error:", err);
+    return res.status(500).json({ error: err.message });
   }
 }
