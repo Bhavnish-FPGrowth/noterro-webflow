@@ -48,7 +48,7 @@ export default async function handler(req, res) {
       const title = item.fieldData.name || item.fieldData.title || "Untitled";
       const slug = item.fieldData.slug || "#";
 
-      comsole.log("item.fieldData", item.fieldData);
+      console.log("item.fieldData", item.fieldData);
 
       // ✅ Rich Text "Content" field
       const text = item.fieldData.content || "";
