@@ -4,51 +4,85 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { _id, collectionId } = req.body;
+    console.log("Webhook payload:", req.body);
+
+    // Webflow’s webhook payload might send itemId (or id) and collectionId
+    const { itemId, id, collectionId } = req.body;
+
+    // Determine which field for the item identifier
+    const item_id = itemId || id;
+    if (!item_id) {
+      throw new Error("Missing itemId or id in webhook payload");
+    }
+    if (!collectionId) {
+      throw new Error("Missing collectionId in webhook payload");
+    }
+
     const apiKey = process.env.WEBFLOW_API_TOKEN;
+    if (!apiKey) {
+      throw new Error("Missing Webflow API token in environment variables");
+    }
 
-    // Step 1: Fetch item
-    const itemRes = await fetch(
-      `https://api.webflow.com/v2/collections/${collectionId}/items/${_id}`,
-      {
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-        },
+    // Step 1: Fetch the item using correct Webflow CMS API
+    const getUrl = `https://api.webflow.com/v2/collections/${collectionId}/items/${item_id}`;
+    const getResp = await fetch(getUrl, {
+      method: "GET",
+      headers: {
+        "Authorization": `Bearer ${apiKey}`,
+        "accept-version": "1.0.0",
       }
-    );
+    });
 
-    if (!itemRes.ok) throw new Error("Failed to fetch item");
-    const blog = await itemRes.json();
+    if (!getResp.ok) {
+      const text = await getResp.text();
+      console.error("Error fetching item:", getResp.status, text);
+      throw new Error(`Failed to fetch item: HTTP ${getResp.status}`);
+    }
 
-    // Step 2: Calculate read time
-    const richText = blog.fieldData?.content || ""; // 👈 Replace 'content' with your Rich Text field slug
-    const words = richText.replace(/<[^>]+>/g, "").trim().split(/\s+/).length;
+    const blog = await getResp.json();
+    // blog.fieldData should contain your fields, e.g. rich text, etc.
+
+    // Step 2: Extract rich text content field
+    // Replace "content" with your actual rich text slug
+    const richText = blog.fieldData?.content || "";
+    // Strip HTML tags
+    const textOnly = richText.replace(/<[^>]+>/g, "");
+    const words = textOnly.trim().split(/\s+/).filter(Boolean).length;
     const readTime = Math.max(1, Math.ceil(words / 200));
 
-    // Step 3: Update CMS item
-    const updateRes = await fetch(
-      `https://api.webflow.com/v2/collections/${collectionId}/items/${_id}`,
-      {
-        method: "PATCH",
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          fieldData: {
-            ...blog.fieldData,
-            "read-time": readTime // 👈 Replace with your custom field slug
-          },
-        }),
+    console.log(`Words count: ${words}, Read time: ${readTime} min`);
+
+    // Step 3: Update the CMS item with the read time
+    const patchUrl = `https://api.webflow.com/v2/collections/${collectionId}/items/${item_id}`;
+    const patchBody = {
+      fieldData: {
+        ...blog.fieldData,
+        "read-time": readTime   // <-- replace with your field's slug
       }
-    );
+    };
 
-    if (!updateRes.ok) throw new Error("Failed to update item");
-    const updated = await updateRes.json();
+    const patchResp = await fetch(patchUrl, {
+      method: "PATCH",
+      headers: {
+        "Authorization": `Bearer ${apiKey}`,
+        "accept-version": "1.0.0",
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(patchBody)
+    });
 
-    return res.status(200).json({ success: true, readTime, updated });
+    if (!patchResp.ok) {
+      const text = await patchResp.text();
+      console.error("Error updating item:", patchResp.status, text);
+      throw new Error(`Failed to update item: HTTP ${patchResp.status}`);
+    }
+
+    const updatedBlog = await patchResp.json();
+
+    return res.status(200).json({ success: true, readTime, updatedBlog });
+
   } catch (err) {
-    console.error("Error:", err);
+    console.error("Handler error:", err);
     return res.status(500).json({ error: err.message });
   }
 }
